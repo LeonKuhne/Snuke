@@ -1,0 +1,8 @@
+echo "snake"
+echo "2 player"
+echo "compete for dot"
+echo "get a dot, extend snake"
+
+echo "run into a snake you die"
+
+
