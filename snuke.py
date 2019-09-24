@@ -7,8 +7,11 @@ from pygame import gfxdraw
 WIDTH = 1920
 HEIGHT = 1080
 SHOT_INTERVAL = 0.2  # in seconds
-FOOD_SIZE = 20
+FOOD_SIZE = 10
 AXIS_THRESHOLD = 0.2
+
+# temp point system
+scores = [0, 0]
 
 class Snake:
     counter = 0
@@ -170,7 +173,6 @@ def start(screen, snakes):
         # kill
         snakesToKill = []
         for snake in snakes:
-            print(snake.id)
             for slapped in snakes:
                 if snake.slap(slapped):
                     if not slapped.slap(snake):
@@ -178,12 +180,20 @@ def start(screen, snakes):
                         print('snake died')
 
         # win condition
-        alive = 0
+        alive = []
         for snake in snakes:
             if not snake.dead:
-                alive += 1
-        if alive == 1:
-            print(snake.name + ' won')
+                alive.append(snake)
+        
+        if len(alive) == 1:
+            name = alive[0].name 
+            if name == "Lexi":
+                scores[0] += 1
+            elif name == "Leon":
+                scores[1] += 1
+            
+            print(name + ' won, scores: lexi[' + str(scores[0]) + '] leon[' + str(scores[1]) + '] ')
+            
             running = False
             return True
         
@@ -225,6 +235,8 @@ def game(screen, joysticks):
             currPlayer += 1
         
         print('starting round...')
+        snakes[0].name = "Lexi"
+        snakes[1].name = "Leon"
         playing = start(screen, snakes)
 
 def connect(screen):
