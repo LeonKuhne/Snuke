@@ -7,12 +7,20 @@ from pygame import gfxdraw
 WIDTH = 1920
 HEIGHT = 1080
 SHOT_INTERVAL = 0.2  # in seconds
-FOOD_SIZE = 20
+FOOD_SIZE = 10
 AXIS_THRESHOLD = 0.2
 
+# temp point system
+scores = [0, 0]
+
 class Snake:
-    def __init__(self, color, start):
+    counter = 0
+    
+    def __init__(self, color, start, joystick, name = 'default'):
+        self.id = Snake.counter
+        Snake.counter += 1
         self.color = color
+        self.name = name
         self.x = start[0]
         self.y = start[1]
         self.xVel = 0
@@ -21,6 +29,12 @@ class Snake:
         self.radius = 20
         self.speed = 20
         self.locHistory = []
+        self.dead = False
+        self.joystick = joystick
+        self.score = 0
+    
+    def win(self):
+        self.score += 1
 
     def move(self, xDir, yDir):
         if(abs(xDir) > AXIS_THRESHOLD):
@@ -51,15 +65,19 @@ class Snake:
         return False
 
     def slap(self, snake):
-        for loc in self.locHistory:
-            if snake.collision(loc):
-                # snake got slapped
-                return True
+        if self.id != snake.id:
+            for loc in self.locHistory:
+                if snake.collision(loc):
+                    # snake got slapped
+                    return True
         return False
 
 
     def feed(self):
         self.length += FOOD_SIZE
+
+    def kill(self):
+        self.dead = True
 
     def draw(self, screen):
         self.locHistory.append((self.x, self.y))
@@ -73,6 +91,9 @@ class Snake:
         pygame.gfxdraw.aacircle(screen, int(self.x), int(self.y), self.radius+1, self.color)
 
     def tick(self):
+        if self.dead:
+            return
+
         # slide
         self.xVel = self.xVel * 0.95
         self.yVel = self.yVel * 0.95
@@ -92,7 +113,6 @@ class Snake:
         self.x += self.xVel
         self.y += self.yVel
 
-
         # sides
         if self.x > WIDTH:
             self.x = WIDTH
@@ -104,35 +124,26 @@ class Snake:
             self.y = 0
 
 
-def draw(screen, s1, s2, food):
+def draw(screen, snakes, food):
     screen.fill((0, 0, 0))
-    s1.draw(screen)
-    s2.draw(screen)
+    for snake in snakes:
+        snake.draw(screen)
 
     # food
     pygame.gfxdraw.filled_circle(screen, int(food[0]), int(food[1]), 5, (255,255,0))
     pygame.gfxdraw.aacircle(screen, int(food[0]), int(food[1]), 5, (255,255,255))
 
-    #pygame.draw.line(screen, (255,255,255), (s1.x, s1.y), (s2.x, s2.y))
-
     pygame.display.flip()
 
-def joyHandle(joystick, snake):
-    xTilt = joystick.get_axis(0)
-    yTilt = joystick.get_axis(1)
+def joyHandle(snake):
+    xTilt = snake.joystick.get_axis(0)
+    yTilt = snake.joystick.get_axis(1)
     snake.move(xTilt, yTilt)
 
-def start(screen, s1, s2):
+def start(screen, snakes):
     running = True
     
     food = [random.randint(0, WIDTH), random.randint(0, HEIGHT)]
-
-    pygame.joystick.init()
-    joysticks = []
-    for x in range(pygame.joystick.get_count()):
-        joystick = pygame.joystick.Joystick(x)
-        joystick.init()
-        joysticks.append(joystick)
 
     # start the loop
     while running:
@@ -141,66 +152,150 @@ def start(screen, s1, s2):
             # quit
             if event.type == pygame.QUIT:
                 running = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    running = False
+                    return False
 
         # controls
         pressed = pygame.key.get_pressed()
 
-        # player 1
-        if pressed[pygame.K_UP]:
-            s1.up()
-        if pressed[pygame.K_LEFT]:
-            s1.left()
-        if pressed[pygame.K_RIGHT]:
-            s1.right()
-        if pressed[pygame.K_DOWN]:
-            s1.down()
-
-        # player 2
-        if pressed[pygame.K_w]:
-            s2.up()
-        if pressed[pygame.K_a]:
-            s2.left()
-        if pressed[pygame.K_d]:
-            s2.right()
-        if pressed[pygame.K_s]:
-            s2.down()
-
         # controller
-        if len(joysticks) > 0:
-            joyHandle(joysticks[0], s1)
-        if len(joysticks) > 1:
-            joyHandle(joysticks[1], s2)
+        for snake in snakes:
+            joyHandle(snake)
         
         # food
-        if s1.collision(food):
-            s1.feed()
-            food = [random.randint(0, WIDTH), random.randint(0, HEIGHT)]
-        if s2.collision(food):
-            s2.feed()
-            food = [random.randint(0, WIDTH), random.randint(0, HEIGHT)]
+        for snake in snakes:
+            if snake.collision(food):
+                snake.feed()
+                food = [random.randint(0, WIDTH), random.randint(0, HEIGHT)]
 
-        if s1.slap(s2) and s2.slap(s1):
-            print('both of you guys killed eachother')
-        elif s1.slap(s2):
-            print('s1 wins')
+        # kill
+        snakesToKill = []
+        for snake in snakes:
+            for slapped in snakes:
+                if snake.slap(slapped):
+                    if not slapped.slap(snake):
+                        slapped.kill()
+                        print('snake died')
+
+        # win condition
+        alive = []
+        for snake in snakes:
+            if not snake.dead:
+                alive.append(snake)
+        
+        if len(alive) == 1:
+            name = alive[0].name 
+            if name == "Lexi":
+                scores[0] += 1
+            elif name == "Leon":
+                scores[1] += 1
+            
+            print(name + ' won, scores: lexi[' + str(scores[0]) + '] leon[' + str(scores[1]) + '] ')
+            
             running = False
-        elif s2.slap(s1):
-            print('s2 wins')
-            running = False
-
-
-        s1.tick()
-        s2.tick()
-
-        draw(screen, s1, s2, food)
+            return True
+        
+        # tick
+        for snake in snakes:
+            snake.tick()
+        
+        # draw
+        draw(screen, snakes, food)
 
         time.sleep(1/120)
 
 
-if __name__ == '__main__':
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+'''
+#
+# Game Stages
+#
+'''
 
-    while True:
-        s1 = Snake((100, 255, 100), (WIDTH/5, HEIGHT/2))
-        s2 = Snake((255, 100, 200), (WIDTH-WIDTH/5, HEIGHT/2))
-        start(screen, s1, s2)
+def game(screen, joysticks):
+    green = (100, 255, 100)
+    purple = (255, 100, 200)
+    red = (255, 100, 100)
+    blue = (100, 100, 255)
+    colors = [green, purple, red, blue]
+    playing = True
+
+    while playing:
+        snakes = []
+        
+        currPlayer = 0
+        for joystick in joysticks:
+            x = (currPlayer+1) * WIDTH//(len(joysticks)+1)
+            y = HEIGHT//2
+            color = colors[currPlayer]
+            snake = Snake(color, (x,y), joystick)
+            snakes.append(snake)
+            
+            currPlayer += 1
+        
+        print('starting round...')
+        snakes[0].name = "Lexi"
+        snakes[1].name = "Leon"
+        playing = start(screen, snakes)
+
+def connect(screen):
+    waiting = True
+    font = pygame.font.SysFont('freemono', 24)
+    
+    white = (255,255,255)
+    black = (0,0,0)
+
+    joysticks = []
+    activeJoysticks = []
+    
+    while waiting:
+        # create text string
+        textStr = "Controller Count:" + str(pygame.joystick.get_count())
+        text = font.render(textStr, True, white)
+        textRect = text.get_rect()
+        textRect.center = (WIDTH//2, HEIGHT//2)
+    
+        # input
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                waiting = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    waiting == False
+
+
+        for joystick in joysticks:
+            aButton = joystick.get_button(0)
+            if aButton:
+                waiting = False
+
+        # connect joysticks
+        pygame.joystick.init()
+        for x in range(pygame.joystick.get_count()):
+            joystick = pygame.joystick.Joystick(x)
+            if x not in activeJoysticks:
+                activeJoysticks.append(x)
+                print('found joystick')
+                joystick.init()
+                joysticks.append(joystick)
+
+        # draw
+        screen.fill(black)
+        screen.blit(text, textRect)
+        pygame.display.flip()
+
+        time.sleep(1/30)
+    
+    return joysticks
+
+
+if __name__ == '__main__':
+    pygame.init()
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption('snuke')
+
+    joysticks = connect(screen)
+    game(screen, joysticks)
+   
