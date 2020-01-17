@@ -7,7 +7,7 @@ from pygame import gfxdraw
 WIDTH = 1920
 HEIGHT = 1080
 SHOT_INTERVAL = 0.2  # in seconds
-FOOD_SIZE = 10
+FOOD_SIZE = 13
 AXIS_THRESHOLD = 0.2
 
 # temp point system

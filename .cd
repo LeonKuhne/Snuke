@@ -3,3 +3,5 @@ echo "many players"
 echo "compete for dot"
 echo "get a dot, extend snake"
 echo "run into a snake you die"
+
+echo -e "\n\n\nmake an ai"
